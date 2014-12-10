@@ -44,6 +44,7 @@ namespace GenerateGatingCaseSummary
         {
             using (TextWriter streamWriter = new StreamWriter(outputFileName))
             {
+                streamWriter.WriteLine("Algorithm,Domain,Channel Code,Channel Type,Data Type,Sampling Rate,Case Name");
                 foreach (var item in summary)
                 {
                     foreach (var line in item.Value)
@@ -55,18 +56,21 @@ namespace GenerateGatingCaseSummary
         }
         private static void getCaseInfo(Dictionary<string, List<String>> summary, IList<String> dirs)
         {
-            string channelCode, domainCode, caseName;
+            string channelCode, domainCode, caseName, dataType, channelType, samplingType;
             IList<String> algorithms;
             foreach (var casePath in dirs)
             {
-                channelCode = getFirstMatchPatternString(casePath, @"\\([A-Za-z0-9\-_\+]+)=");
-                domainCode = getFirstMatchPatternString(casePath,@"=([A-Za-z0-9\-]+)@\(");
-                caseName = getFirstMatchPatternString(casePath,@"\\([A-Za-z0-9_@\(\)=\-]+)$");
+                channelCode = getFirstMatchPatternString(casePath, @"\\([A-Za-z0-9\-_\+]+)\[");
+                channelType = getFirstMatchPatternString(casePath, @"\[([0-9]+)\-");
+                dataType = getFirstMatchPatternString(casePath, @"\-([A-Z0-9_]+)\]");
+                domainCode = getDomainInfo(casePath);
+                caseName = casePath.Split(new string[]{@"\"}, StringSplitOptions.RemoveEmptyEntries).Last();
+                samplingType = getSamplingRate(casePath);
                 algorithms = analyzeAlgorithms(casePath);
 
                 foreach (var algorithm in algorithms)
                 {
-                    string line = string.Format("{0},{1},{2},{3}", algorithm, domainCode, channelCode, caseName);
+                    string line = string.Format("{0},{1},{2},{3},{4},{5},{6}", algorithm, domainCode, channelCode, channelType, dataType, samplingType, caseName );
                     if (!summary.ContainsKey(algorithm))
                     {
                         summary[algorithm] = new List<string>();
@@ -74,6 +78,33 @@ namespace GenerateGatingCaseSummary
                     summary[algorithm].Add(line);
                 }
             }
+        }
+
+        static string getDomainInfo(string casePath)
+        {
+            string result = string.Empty;
+            if (casePath.Contains(")DEPTH[") || casePath.Contains("=DEPTH["))
+            {
+                result = "DEPTH";
+            }
+
+            if (casePath.Contains(")TIME[") || casePath.Contains("=TIME[") )
+            {
+                result += "/TIME";
+            }
+            return result;
+        }
+
+        static string getSamplingRate(string casePath)
+        {
+            string result = string.Empty;
+            string pattern = @"([0-9_\[\]]+)@";
+            var matches = Regex.Matches(casePath, pattern, RegexOptions.Singleline);
+            foreach (Match match in matches)
+            {
+                result += match.Groups[1].Value;
+            }
+            return result;
         }
 
         static List<String> getAllMatchChildFolders(string rootPath)
@@ -108,14 +139,14 @@ namespace GenerateGatingCaseSummary
 
         static IList<string> analyzeAlgorithms(string gateCasePath)
         {
-            List<String> algorithms = new List<string>();
+            HashSet<String> algorithms = new HashSet<String>();
             string channelNamePattern = @"\(([A-Za-z_]+)\)";
             var matches = Regex.Matches(gateCasePath, channelNamePattern, RegexOptions.Singleline);
             foreach (Match match in matches)
             {
                 algorithms.Add(match.Groups[1].Value);
             }
-            return algorithms;
+            return algorithms.ToList();
         }
     }
 }
