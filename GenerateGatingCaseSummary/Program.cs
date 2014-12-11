@@ -98,7 +98,7 @@ namespace GenerateGatingCaseSummary
         static string getSamplingRate(string casePath)
         {
             string result = string.Empty;
-            string pattern = @"([0-9_\[\]]+)@";
+            string pattern = @"([0-9.\[\]]+)@";
             var matches = Regex.Matches(casePath, pattern, RegexOptions.Singleline);
             foreach (Match match in matches)
             {
