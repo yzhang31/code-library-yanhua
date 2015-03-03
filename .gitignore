@@ -5,3 +5,7 @@
 *.cache
 *.txt
 *.suo
+*release*
+*debug*
+*.sdf
+*.ipch
