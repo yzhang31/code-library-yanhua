@@ -118,7 +118,7 @@ typedef struct ColumnInfoLayout
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    wstring input_htd_filename =  L"d:\\temp\\1\\empty.htd";
+    wstring input_htd_filename =  L"d:\\temp\\5\\AcqRaw_FRAME_DEPTH_0_1_93A3BB89-BDD9-4D80-890B-2163A3803779_.htd";
 
     // Open htd file to read header.
     ifstream is_htd(input_htd_filename, std::ios::binary);
@@ -136,33 +136,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		is_htd.read((char*)&header, sizeof(HeaderLayout_t));
 	}
-
-	unsigned long rowSize = header.RowSize;
-
-    int columnCount = header.ColumnCount;
-
-    is_htd.seekg(128,is_htd.beg);
-
-    vector<ColumnInfoLayout_t> columns;
-
-    // Read column info.  col 0 is RSWMLH, col 1 is SWMLHN
-    ColumnInfoLayout_t col = { 0 };
-    for (int i = 0; i < columnCount; i++)
-    {
-        is_htd.read((char*)&col, sizeof(ColumnInfoLayout_t));
-        columns.push_back(col);
-    }
-
-
     is_htd.close();
 
 
-    header.BlobOffset = 0;
-    header.TruncatedFile = FALSE;
-    header.SequenceNumber = -1;
-    header.RestrictedSequenceNumber = -1;
-    header.IndexStart = std::numeric_limits<double>::quiet_NaN();
-    header.IndexStop = std::numeric_limits<double>::quiet_NaN();
+    header.SequenceNumber = 258889;
+    header.IndexStop = 42236.1105710839;
 
 
     fstream os_htd(input_htd_filename, std::ios::binary  | ios::in | ios::out);
@@ -174,15 +152,7 @@ int _tmain(int argc, _TCHAR* argv[])
     os_htd.seekp(0, ios_base::beg);
     os_htd.write((char*)&header, sizeof(HeaderLayout_t));
 
-    os_htd.seekp(header.HeaderSize, ios_base::beg);
-
-    while (os_htd.tellp() != end)
-    {
-        os_htd.put('\0');
-    }
-
     os_htd.close();
-
 
 	return 0;
 }
