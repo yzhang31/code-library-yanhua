@@ -114,45 +114,77 @@ typedef struct ColumnInfoLayout
 }ColumnInfoLayout_t;
 
 
+struct BlobBlockHeader
+{
+    __int64 BlobOffset;                        //data type change from unsigned long to __int64 to support over 4G file
+    unsigned long BlobSize;
+};
+
 
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    wstring input_htd_filename =  L"d:\\temp\\5\\AcqRaw_FRAME_DEPTH_0_1_93A3BB89-BDD9-4D80-890B-2163A3803779_.htd";
+    wstring input_htd_filename =  L"d:\\Temp\\1\\0_2_HRGD_LQC_STAT_9E3FFF01-C056-4C85-8773-12CAF9737730_.htd";
 
     // Open htd file to read header.
-    ifstream is_htd(input_htd_filename, std::ios::binary);
+    ifstream htd_input_stream(input_htd_filename, std::ios::binary);
     
-    if (!is_htd.is_open())
+    if (!htd_input_stream.is_open())
     {
         std::wcout << L"Fail to open file: " << input_htd_filename << std::endl;
         return -1;
     }
 
-	is_htd.seekg(0, std::ios::beg);
+	htd_input_stream.seekg(0, std::ios::beg);
 
 	HeaderLayout_t header = { 0 };
-	if (!is_htd.eof())
-	{
-		is_htd.read((char*)&header, sizeof(HeaderLayout_t));
-	}
-    is_htd.close();
-
-
-    header.SequenceNumber = 258889;
-    header.IndexStop = 42236.1105710839;
-
-
-    fstream os_htd(input_htd_filename, std::ios::binary  | ios::in | ios::out);
     
-    streampos end;
-    os_htd.seekg(0, ios::end);
-    end = os_htd.tellg();
+	if (!htd_input_stream.eof())
+	{
+		htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
+	}
 
-    os_htd.seekp(0, ios_base::beg);
-    os_htd.write((char*)&header, sizeof(HeaderLayout_t));
+    // Read the column information
+    vector<ColumnInfoLayout_t> columns;
+    DWORD dwRead;
 
-    os_htd.close();
+    htd_input_stream.seekg(128, std::ios::beg);
+
+    for (unsigned long seqNo = 0; seqNo < header.ColumnCount; seqNo++)
+    {
+        ColumnInfoLayout_t col = { 0 };
+        htd_input_stream.read((char*)&col, sizeof(ColumnInfoLayout_t));
+        columns.push_back(col);
+    }
+
+
+    htd_input_stream.seekg(header.HeaderSize, std::ios::beg);
+
+
+        for (auto itor = columns.begin(); itor != columns.end(); itor++)
+        {
+            std::cout << itor->m_ColumnName << ": " << std::endl;
+            for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
+            {
+                if (itor->m_ColumnDimensionCount > 0)
+                {
+                    LARGE_INTEGER liDistanceToMove;
+                    unsigned long pos = header.HeaderSize + header.RowSize * seqNo + itor->m_ColumnOffset;
+                
+                    htd_input_stream.seekg(pos, std::ios::beg );
+
+                    BlobBlockHeader blobHeader;
+
+                    //::ReadFile(hFile, &blobHeader, sizeof(BlobBlockHeader), &dwRead, 0);
+
+                    BlobBlockHeader block;
+                    htd_input_stream.read((char*)&block, sizeof(BlobBlockHeader));
+                    std::cout << "blob Offset: " << std::dec << block.BlobOffset << " Blob Size: " << block.BlobSize << std::endl;
+                }
+            }
+        }
+
+    htd_input_stream.close();
 
 	return 0;
 }
