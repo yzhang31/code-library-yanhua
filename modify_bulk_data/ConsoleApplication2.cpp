@@ -121,10 +121,119 @@ struct BlobBlockHeader
 };
 
 
+struct TimeIndexValue
+{
+    long seqNumber;
+    unsigned long fileOffsetPos;
+    double time1900;
+};
+
+vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
+{
+    vector<TimeIndexValue> time_1900_index;
+
+    htd_input_stream.seekg(0, std::ios::beg);
+
+    HeaderLayout_t header = { 0 };
+
+    if (!htd_input_stream.eof())
+    {
+        htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
+    }
+
+    // Read the column information
+    vector<ColumnInfoLayout_t> columns;
+    DWORD dwRead;
+    
+    htd_input_stream.seekg(128, std::ios::beg);
+
+    for (unsigned long seqNo = 0; seqNo < header.ColumnCount; seqNo++)
+    {
+        ColumnInfoLayout_t col = { 0 };
+        htd_input_stream.read((char*)&col, sizeof(ColumnInfoLayout_t));
+        columns.push_back(col);
+    }
+
+    time_1900_index.reserve(header.SequenceNumber);
+
+    for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
+    {
+
+        LARGE_INTEGER liDistanceToMove;
+        unsigned long pos = header.HeaderSize + header.RowSize * seqNo;
+        htd_input_stream.seekg(pos, std::ios::beg);
+        long seq;
+        htd_input_stream.read((char*)&seq, sizeof(long));
+
+        for (auto itor = columns.begin(); itor != columns.end(); itor++)
+        {
+            if (std::string(itor->m_ColumnName) != "TIME_1900")
+            {
+                continue;
+            }
+
+            pos = header.HeaderSize + header.RowSize * seqNo + itor->m_ColumnOffset;
+            htd_input_stream.seekg(pos, std::ios::beg);
+
+            double time_index;
+            htd_input_stream.read((char*)&time_index, sizeof(double));
+
+            TimeIndexValue indexValue;
+            indexValue.fileOffsetPos = pos;
+            indexValue.time1900 = time_index;
+            indexValue.seqNumber = seq;
+            time_1900_index.push_back(indexValue);
+            
+        }
+
+    }
+    return time_1900_index;
+}
+
+
+vector<TimeIndexValue> process_indexs(const vector<TimeIndexValue>& original_time_indexs)
+{
+    vector<TimeIndexValue> processed_indexs = original_time_indexs;
+    vector<TimeIndexValue> modify_record;
+    double spacing   = 0.000000092499;
+    double jumpspace = 0.000094;
+    
+    int jumpback_ref_count = 0;    
+
+    for (size_t i = 1; i < original_time_indexs.size(); i++)
+    {
+        if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 < -1 * jumpspace)
+        {
+            jumpback_ref_count--;
+            processed_indexs[i].time1900 = processed_indexs[i - 1].time1900 + spacing;
+            modify_record.push_back(processed_indexs[i]);
+        }
+        else if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 > jumpspace)
+        {
+            if (jumpback_ref_count < 0)
+            {
+                jumpback_ref_count++;
+                processed_indexs[i].time1900 = processed_indexs[i - 1].time1900 + spacing;
+                modify_record.push_back(processed_indexs[i]);
+            }
+        }
+        else
+        {
+            if (jumpback_ref_count < 0)
+            {
+                processed_indexs[i].time1900 = processed_indexs[i - 1].time1900 + spacing;
+                modify_record.push_back(processed_indexs[i]);
+            }
+        }
+        
+    }
+    return processed_indexs;
+
+}
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    wstring input_htd_filename =  L"d:\\Temp\\1\\0_2_HRGD_LQC_STAT_9E3FFF01-C056-4C85-8773-12CAF9737730_.htd";
+    wstring input_htd_filename =  L"d:\\Temp\\1\\GPITF_FAST_ACQ_DOMAIN_0_0_12773CFF-99AB-4DCE-95E0-B41F3EE31DCF_.htd";
 
     // Open htd file to read header.
     ifstream htd_input_stream(input_htd_filename, std::ios::binary);
@@ -160,29 +269,46 @@ int _tmain(int argc, _TCHAR* argv[])
 
     htd_input_stream.seekg(header.HeaderSize, std::ios::beg);
 
+    auto time_1900_indexs = read_time_1900(htd_input_stream);
 
-        for (auto itor = columns.begin(); itor != columns.end(); itor++)
-        {
-            std::cout << itor->m_ColumnName << ": " << std::endl;
-            for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
-            {
-                if (itor->m_ColumnDimensionCount > 0)
-                {
-                    LARGE_INTEGER liDistanceToMove;
-                    unsigned long pos = header.HeaderSize + header.RowSize * seqNo + itor->m_ColumnOffset;
-                
-                    htd_input_stream.seekg(pos, std::ios::beg );
+    auto corrected_time_1900_index = process_indexs(time_1900_indexs);
 
-                    BlobBlockHeader blobHeader;
+    
 
-                    //::ReadFile(hFile, &blobHeader, sizeof(BlobBlockHeader), &dwRead, 0);
+    //for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
+    //{
+    //    for (auto itor = columns.begin(); itor != columns.end(); itor++)
+    //    {
+    //        LARGE_INTEGER liDistanceToMove;
+    //        unsigned long pos = header.HeaderSize + header.RowSize * seqNo + itor->m_ColumnOffset;
+    //        std::cout << itor->m_ColumnName << ": " << std::endl;
+    //        htd_input_stream.seekg(pos, std::ios::beg);
+    //        std::cout.precision(18);
 
-                    BlobBlockHeader block;
-                    htd_input_stream.read((char*)&block, sizeof(BlobBlockHeader));
-                    std::cout << "blob Offset: " << std::dec << block.BlobOffset << " Blob Size: " << block.BlobSize << std::endl;
-                }
-            }
-        }
+    //            if (itor->m_ColumnDimensionCount > 0)
+    //            {
+    //                BlobBlockHeader blobHeader;
+
+    //                BlobBlockHeader block;
+    //                htd_input_stream.read((char*)&block, sizeof(BlobBlockHeader));
+    //                std::cout << "blob Offset: " << std::dec << block.BlobOffset << " Blob Size: " << block.BlobSize << std::endl;
+    //            }
+    //            else if (itor->m_ColumnDataType == DATA_TYPE_IEEE64)
+    //            {
+    //                double value;
+    //                htd_input_stream.read((char*)&value, sizeof(double));
+    //                std::cout.precision(18);
+    //                std::cout << value << std::endl;
+    //            }
+    //            else if (itor->m_ColumnDataType == DATA_TYPE_IEEE32)
+    //            {
+    //                float value;
+    //                htd_input_stream.read((char*)&value, sizeof(double));
+
+    //                std::cout << value << std::endl;
+    //            }
+    //     }
+    // }
 
     htd_input_stream.close();
 
