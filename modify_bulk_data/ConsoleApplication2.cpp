@@ -271,7 +271,14 @@ int _tmain(int argc, _TCHAR* argv[])
 
     auto time_1900_indexs = read_time_1900(htd_input_stream);
 
+    htd_input_stream.close();
+
+    // Open htd file to correct data.
+    ifstream htd_output_stream(input_htd_filename, std::ios::binary);
+
     auto corrected_time_1900_index = process_indexs(time_1900_indexs);
+
+
 
     
 
@@ -310,7 +317,7 @@ int _tmain(int argc, _TCHAR* argv[])
     //     }
     // }
 
-    htd_input_stream.close();
+
 
 	return 0;
 }
