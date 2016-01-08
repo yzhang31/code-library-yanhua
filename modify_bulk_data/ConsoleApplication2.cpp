@@ -124,7 +124,7 @@ struct BlobBlockHeader
 struct TimeIndexValue
 {
     long seqNumber;
-    unsigned long fileOffsetPos;
+    unsigned long filePos;
     double time1900;
 };
 
@@ -143,7 +143,6 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
 
     // Read the column information
     vector<ColumnInfoLayout_t> columns;
-    DWORD dwRead;
     
     htd_input_stream.seekg(128, std::ios::beg);
 
@@ -159,7 +158,6 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
     for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
     {
 
-        LARGE_INTEGER liDistanceToMove;
         unsigned long pos = header.HeaderSize + header.RowSize * seqNo;
         htd_input_stream.seekg(pos, std::ios::beg);
         long seq;
@@ -179,7 +177,7 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
             htd_input_stream.read((char*)&time_index, sizeof(double));
 
             TimeIndexValue indexValue;
-            indexValue.fileOffsetPos = pos;
+            indexValue.filePos = pos;
             indexValue.time1900 = time_index;
             indexValue.seqNumber = seq;
             time_1900_index.push_back(indexValue);
@@ -191,7 +189,7 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
 }
 
 
-vector<TimeIndexValue> process_indexs(const vector<TimeIndexValue>& original_time_indexs)
+vector<TimeIndexValue> get_need_modified_indexs(const vector<TimeIndexValue>& original_time_indexs)
 {
     vector<TimeIndexValue> processed_indexs = original_time_indexs;
     vector<TimeIndexValue> modify_record;
@@ -227,8 +225,7 @@ vector<TimeIndexValue> process_indexs(const vector<TimeIndexValue>& original_tim
         }
         
     }
-    return processed_indexs;
-
+    return modify_record;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -255,7 +252,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
     // Read the column information
     vector<ColumnInfoLayout_t> columns;
-    DWORD dwRead;
 
     htd_input_stream.seekg(128, std::ios::beg);
 
@@ -273,52 +269,29 @@ int _tmain(int argc, _TCHAR* argv[])
 
     htd_input_stream.close();
 
+
+
+    auto corrected_time_1900_index = get_need_modified_indexs(time_1900_indexs);
     // Open htd file to correct data.
-    ifstream htd_output_stream(input_htd_filename, std::ios::binary);
+    fstream os_htd(input_htd_filename, std::ios::binary | ios::in | ios::out);
 
-    auto corrected_time_1900_index = process_indexs(time_1900_indexs);
+    streampos end;
+    os_htd.seekg(0, ios::end);
+    end = os_htd.tellg();
 
-
-
-    
-
-    //for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
-    //{
-    //    for (auto itor = columns.begin(); itor != columns.end(); itor++)
-    //    {
-    //        LARGE_INTEGER liDistanceToMove;
-    //        unsigned long pos = header.HeaderSize + header.RowSize * seqNo + itor->m_ColumnOffset;
-    //        std::cout << itor->m_ColumnName << ": " << std::endl;
-    //        htd_input_stream.seekg(pos, std::ios::beg);
-    //        std::cout.precision(18);
-
-    //            if (itor->m_ColumnDimensionCount > 0)
-    //            {
-    //                BlobBlockHeader blobHeader;
-
-    //                BlobBlockHeader block;
-    //                htd_input_stream.read((char*)&block, sizeof(BlobBlockHeader));
-    //                std::cout << "blob Offset: " << std::dec << block.BlobOffset << " Blob Size: " << block.BlobSize << std::endl;
-    //            }
-    //            else if (itor->m_ColumnDataType == DATA_TYPE_IEEE64)
-    //            {
-    //                double value;
-    //                htd_input_stream.read((char*)&value, sizeof(double));
-    //                std::cout.precision(18);
-    //                std::cout << value << std::endl;
-    //            }
-    //            else if (itor->m_ColumnDataType == DATA_TYPE_IEEE32)
-    //            {
-    //                float value;
-    //                htd_input_stream.read((char*)&value, sizeof(double));
-
-    //                std::cout << value << std::endl;
-    //            }
-    //     }
-    // }
+    os_htd.seekp(header.HeaderSize, ios_base::beg);
 
 
+    for (auto item : corrected_time_1900_index)
+    {
 
+        os_htd.seekg(item.filePos, std::ios::beg);
+        os_htd.write((char *) & item.time1900, sizeof(double));
+
+    }
+
+
+    os_htd.close();
 	return 0;
 }
 
