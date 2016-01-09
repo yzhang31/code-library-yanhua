@@ -1,4 +1,4 @@
-// ConsoleApplication2.cpp : Defines the entry point for the console application.
+﻿// ConsoleApplication2.cpp : Defines the entry point for the console application.
 //
 
 #include "stdafx.h"
@@ -10,6 +10,7 @@
 #include <array>
 #include <string>
 #include <limits>
+#include <assert.h>  
 
 using namespace std;
 using namespace std::tr1;
@@ -128,6 +129,52 @@ struct TimeIndexValue
     double time1900;
 };
 
+//vector<string> get_all_htd_files_names_within_folder(string folder)
+//{
+//    vector<string> names;
+//    char search_path[200];
+//    sprintf(search_path, "%s/*.htd", folder.c_str());   // *.htd will filter all *.htd file out.
+//    WIN32_FIND_DATAA fd;
+//    HANDLE hFind = ::FindFirstFileA(search_path, &fd);
+//    if (hFind != INVALID_HANDLE_VALUE) {
+//        do {
+//            // read all (real) files in current folder
+//            // , delete '!' read other 2 default folder . and ..
+//            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+//                names.push_back(fd.cFileName);
+//            }
+//        } while (FindNextFileA(hFind, &fd));
+//        FindClose(hFind);
+//    }
+//    return names;
+//}
+
+vector<wstring> get_all_htd_files_names_within_folder(wstring folder)
+{
+    vector<wstring> names;
+    wchar_t search_path[200];
+    wsprintfW(search_path, L"%s/*.htd", folder.c_str());   // *.htd will filter all *.htd file out.
+    WIN32_FIND_DATA fd;
+    HANDLE hFind = ::FindFirstFile(search_path, &fd);
+    if (hFind != INVALID_HANDLE_VALUE) 
+    {
+        do 
+        {
+            // read all (real) files in current folder
+            // , delete '!' read other 2 default folder . and ..
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) 
+            {
+                wstring fullname = folder + L"\\" + fd.cFileName;
+                names.push_back(fullname);
+            }
+        } while (::FindNextFile(hFind, &fd));
+        FindClose(hFind);
+    }
+    return names;
+}
+
+
+
 vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
 {
     vector<TimeIndexValue> time_1900_index;
@@ -155,7 +202,7 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
 
     time_1900_index.reserve(header.SequenceNumber);
 
-    for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
+    for (size_t seqNo = 0; seqNo <= header.SequenceNumber; seqNo++)
     {
 
         unsigned long pos = header.HeaderSize + header.RowSize * seqNo;
@@ -189,109 +236,167 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
 }
 
 
-vector<TimeIndexValue> get_need_modified_indexs(const vector<TimeIndexValue>& original_time_indexs)
+vector<TimeIndexValue> modified_indexs(const vector<TimeIndexValue>& original_time_indexs)
 {
-    vector<TimeIndexValue> processed_indexs = original_time_indexs;
-    vector<TimeIndexValue> modify_record;
-    double spacing   = 0.000000092499;
-    double jumpspace = 0.000094;
-    
+    vector<TimeIndexValue> full_modify_record;
+    double jump_space = 0.000094;
+   
     int jumpback_ref_count = 0;    
+
+
+    double time_1900_previous_valid = 0.0;
+    double time_1900_next_valid = 0.0;
+
+    double latest_spacing = 0.0;
+
+    vector<TimeIndexValue> segment_modify_record;
 
     for (size_t i = 1; i < original_time_indexs.size(); i++)
     {
-        if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 < -1 * jumpspace)
+        TimeIndexValue correction = original_time_indexs[i];
+        if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 < -1 * jump_space)
         {
+            if (jumpback_ref_count == 0)
+            {
+                time_1900_previous_valid = original_time_indexs[i - 1].time1900;
+            }
             jumpback_ref_count--;
-            processed_indexs[i].time1900 = processed_indexs[i - 1].time1900 + spacing;
-            modify_record.push_back(processed_indexs[i]);
+            segment_modify_record.push_back(correction);
         }
-        else if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 > jumpspace)
+        else if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 > jump_space)
         {
             if (jumpback_ref_count < 0)
             {
+
                 jumpback_ref_count++;
-                processed_indexs[i].time1900 = processed_indexs[i - 1].time1900 + spacing;
-                modify_record.push_back(processed_indexs[i]);
+                if (jumpback_ref_count == 0)
+                {
+                    time_1900_next_valid = i < original_time_indexs.size() ? 
+                        original_time_indexs[i + 1].time1900 : std::numeric_limits<double>::quiet_NaN();
+                }
+                segment_modify_record.push_back(correction);
+
             }
         }
         else
         {
             if (jumpback_ref_count < 0)
             {
-                processed_indexs[i].time1900 = processed_indexs[i - 1].time1900 + spacing;
-                modify_record.push_back(processed_indexs[i]);
+                segment_modify_record.push_back(correction);
             }
+        }
+
+        if (segment_modify_record.size() > 0 && jumpback_ref_count == 0)
+        {
+            double spacing = (time_1900_next_valid - time_1900_previous_valid) / (segment_modify_record.size() + 1);
+            
+            if (isnan(spacing))
+            {
+                spacing = latest_spacing;
+            }
+
+            for (size_t i = 0; i < segment_modify_record.size() ; i++)
+            {
+                segment_modify_record[i].time1900 = time_1900_previous_valid + (i + 1) * spacing;
+                full_modify_record.push_back(segment_modify_record[i]);
+            }
+
+            latest_spacing = spacing;
+            segment_modify_record.clear();
+            time_1900_previous_valid = 0.0;
+            time_1900_next_valid = 0.0;
         }
         
     }
-    return modify_record;
+
+    assert(jumpback_ref_count == 0);
+    return full_modify_record;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    wstring input_htd_filename =  L"d:\\Temp\\1\\GPITF_FAST_ACQ_DOMAIN_0_0_12773CFF-99AB-4DCE-95E0-B41F3EE31DCF_.htd";
 
-    // Open htd file to read header.
-    ifstream htd_input_stream(input_htd_filename, std::ios::binary);
-    
-    if (!htd_input_stream.is_open())
+    vector<wstring> htd_file_list = get_all_htd_files_names_within_folder(L"D:\\Temp\\2");
+
+
+    for (auto htd_file : htd_file_list)
     {
-        std::wcout << L"Fail to open file: " << input_htd_filename << std::endl;
-        return -1;
+        // Open htd file to read header.
+        ifstream htd_input_stream(htd_file, std::ios::binary);
+
+        if (!htd_input_stream.is_open())
+        {
+            std::wcout << L"Fail to open file: " << htd_file << std::endl;
+            return -1;
+        }
+
+        std::wcout << L"Checking File : " << htd_file << L" indexs. " << std::endl;
+
+        htd_input_stream.seekg(0, std::ios::beg);
+
+        HeaderLayout_t header = { 0 };
+
+        if (!htd_input_stream.eof())
+        {
+            htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
+        }
+
+        // Read the column information
+        vector<ColumnInfoLayout_t> columns;
+
+        htd_input_stream.seekg(128, std::ios::beg);
+
+        for (unsigned long seqNo = 0; seqNo < header.ColumnCount; seqNo++)
+        {
+            ColumnInfoLayout_t col = { 0 };
+            htd_input_stream.read((char*)&col, sizeof(ColumnInfoLayout_t));
+            columns.push_back(col);
+        }
+
+
+        htd_input_stream.seekg(header.HeaderSize, std::ios::beg);
+
+        std::wcout << L"\t Reading index....";
+
+        auto time_1900_indexs = read_time_1900(htd_input_stream);
+
+        
+        htd_input_stream.close();
+        std::wcout << L"...DONE..." <<endl;
+
+        std::wcout << L"\t Checking index....";
+        auto corrected_time_1900_index = modified_indexs(time_1900_indexs);
+
+        if (corrected_time_1900_index.size() == 0)
+        {
+            std::wcout << L"...No jump, skip..." << endl;
+            continue;
+        }
+
+        std::wcout << L" Has " <<corrected_time_1900_index.size() << L" wrong index" <<endl;
+
+
+        std::wcout << L"\t Correcting index....";
+        // Open htd file to correct data.
+        fstream os_htd(htd_file, std::ios::binary | ios::in | ios::out);
+        streampos end;
+        os_htd.seekg(0, ios::end);
+        end = os_htd.tellg();
+
+        os_htd.seekp(header.HeaderSize, ios_base::beg);
+
+        for (auto item : corrected_time_1900_index)
+        {
+
+            os_htd.seekg(item.filePos, std::ios::beg);
+            os_htd.write((char *)& item.time1900, sizeof(double));
+
+        }
+
+        os_htd.close();
+        std::wcout << L"...DONE..." << endl << endl;
     }
 
-	htd_input_stream.seekg(0, std::ios::beg);
-
-	HeaderLayout_t header = { 0 };
-    
-	if (!htd_input_stream.eof())
-	{
-		htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
-	}
-
-    // Read the column information
-    vector<ColumnInfoLayout_t> columns;
-
-    htd_input_stream.seekg(128, std::ios::beg);
-
-    for (unsigned long seqNo = 0; seqNo < header.ColumnCount; seqNo++)
-    {
-        ColumnInfoLayout_t col = { 0 };
-        htd_input_stream.read((char*)&col, sizeof(ColumnInfoLayout_t));
-        columns.push_back(col);
-    }
-
-
-    htd_input_stream.seekg(header.HeaderSize, std::ios::beg);
-
-    auto time_1900_indexs = read_time_1900(htd_input_stream);
-
-    htd_input_stream.close();
-
-
-
-    auto corrected_time_1900_index = get_need_modified_indexs(time_1900_indexs);
-    // Open htd file to correct data.
-    fstream os_htd(input_htd_filename, std::ios::binary | ios::in | ios::out);
-
-    streampos end;
-    os_htd.seekg(0, ios::end);
-    end = os_htd.tellg();
-
-    os_htd.seekp(header.HeaderSize, ios_base::beg);
-
-
-    for (auto item : corrected_time_1900_index)
-    {
-
-        os_htd.seekg(item.filePos, std::ios::beg);
-        os_htd.write((char *) & item.time1900, sizeof(double));
-
-    }
-
-
-    os_htd.close();
 	return 0;
 }
 
