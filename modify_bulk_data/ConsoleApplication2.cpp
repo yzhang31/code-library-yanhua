@@ -316,7 +316,7 @@ vector<TimeIndexValue> modified_indexs(const vector<TimeIndexValue>& original_ti
 int _tmain(int argc, _TCHAR* argv[])
 {
 
-    vector<wstring> htd_file_list = get_all_htd_files_names_within_folder(L"D:\\Temp\\2");
+    vector<wstring> htd_file_list = get_all_htd_files_names_within_folder(L"d:\\Schlumberger Data\\Horizon\\BulkData\\6FEC4982-5B1E-4271-81EB-AFAEA3CF5789");
 
 
     for (auto htd_file : htd_file_list)
