@@ -11,6 +11,7 @@
 #include <string>
 #include <limits>
 #include <assert.h>  
+#include <numeric>
 
 using namespace std;
 using namespace std::tr1;
@@ -239,84 +240,85 @@ vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
 vector<TimeIndexValue> modified_indexs(const vector<TimeIndexValue>& original_time_indexs)
 {
     vector<TimeIndexValue> full_modify_record;
-    double jump_space = 0.000094;
-   
-    int jumpback_ref_count = 0;    
 
 
-    double time_1900_previous_valid = 0.0;
-    double time_1900_next_valid = 0.0;
+    size_t length = original_time_indexs.size();
+    TimeIndexValue lastTimeIndex = original_time_indexs[length - 1];
 
-    double latest_spacing = 0.0;
-
-    vector<TimeIndexValue> segment_modify_record;
-
-    for (size_t i = 1; i < original_time_indexs.size(); i++)
+    if (abs(lastTimeIndex.time1900) < numeric_limits<double>::epsilon() )
     {
-        TimeIndexValue correction = original_time_indexs[i];
-        if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 < -1 * jump_space)
-        {
-            if (jumpback_ref_count == 0)
-            {
-                time_1900_previous_valid = original_time_indexs[i - 1].time1900;
-            }
-            jumpback_ref_count--;
-            segment_modify_record.push_back(correction);
-        }
-        else if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 > jump_space)
-        {
-            if (jumpback_ref_count < 0)
-            {
-
-                jumpback_ref_count++;
-                if (jumpback_ref_count == 0)
-                {
-                    time_1900_next_valid = i < original_time_indexs.size() ? 
-                        original_time_indexs[i + 1].time1900 : std::numeric_limits<double>::quiet_NaN();
-                }
-                segment_modify_record.push_back(correction);
-
-            }
-        }
-        else
-        {
-            if (jumpback_ref_count < 0)
-            {
-                segment_modify_record.push_back(correction);
-            }
-        }
-
-        if (segment_modify_record.size() > 0 && jumpback_ref_count == 0)
-        {
-            double spacing = (time_1900_next_valid - time_1900_previous_valid) / (segment_modify_record.size() + 1);
-            
-            if (isnan(spacing))
-            {
-                spacing = latest_spacing;
-            }
-
-            for (size_t i = 0; i < segment_modify_record.size() ; i++)
-            {
-                segment_modify_record[i].time1900 = time_1900_previous_valid + (i + 1) * spacing;
-                full_modify_record.push_back(segment_modify_record[i]);
-            }
-
-            latest_spacing = spacing;
-            segment_modify_record.clear();
-            time_1900_previous_valid = 0.0;
-            time_1900_next_valid = 0.0;
-        }
-        
+        TimeIndexValue neareastCorrect = original_time_indexs[length - 2];
+        double spacing = neareastCorrect.time1900 - original_time_indexs[length - 3].time1900;
+        lastTimeIndex.time1900 = neareastCorrect.time1900 + spacing;
+        full_modify_record.push_back(lastTimeIndex);
     }
 
-    assert(jumpback_ref_count == 0);
+    //for (size_t i = 1; i < original_time_indexs.size(); i++)
+    //{
+    //    TimeIndexValue correction = original_time_indexs[i];
+    //    if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 < -1 * jump_space)
+    //    {
+    //        if (jumpback_ref_count == 0)
+    //        {
+    //            time_1900_previous_valid = original_time_indexs[i - 1].time1900;
+    //        }
+    //        jumpback_ref_count--;
+    //        segment_modify_record.push_back(correction);
+    //    }
+    //    else if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 > jump_space)
+    //    {
+    //        if (jumpback_ref_count < 0)
+    //        {
+
+    //            jumpback_ref_count++;
+    //            if (jumpback_ref_count == 0)
+    //            {
+    //                time_1900_next_valid = i < original_time_indexs.size() ? 
+    //                    original_time_indexs[i + 1].time1900 : std::numeric_limits<double>::quiet_NaN();
+    //            }
+    //            segment_modify_record.push_back(correction);
+
+    //        }
+    //    }
+    //    else
+    //    {
+    //        if (jumpback_ref_count < 0)
+    //        {
+    //            segment_modify_record.push_back(correction);
+    //        }
+    //    }
+
+    //    if (segment_modify_record.size() > 0 && jumpback_ref_count == 0)
+    //    {
+    //        double spacing = (time_1900_next_valid - time_1900_previous_valid) / (segment_modify_record.size() + 1);
+    //        
+    //        if (isnan(spacing))
+    //        {
+    //            spacing = latest_spacing;
+    //        }
+
+    //        for (size_t i = 0; i < segment_modify_record.size() ; i++)
+    //        {
+    //            segment_modify_record[i].time1900 = time_1900_previous_valid + (i + 1) * spacing;
+    //            full_modify_record.push_back(segment_modify_record[i]);
+    //        }
+
+    //        latest_spacing = spacing;
+    //        segment_modify_record.clear();
+    //        time_1900_previous_valid = 0.0;
+    //        time_1900_next_valid = 0.0;
+    //    }
+    //    
+    //}
+
     return full_modify_record;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-
-    vector<wstring> htd_file_list = get_all_htd_files_names_within_folder(L"d:\\Schlumberger Data\\Horizon\\BulkData\\6FEC4982-5B1E-4271-81EB-AFAEA3CF5789");
+    wstring bulk_data_folder = L"d:\\dev\\tickets\\Missing_Usit\\Origin_Raw\\raw";
+    vector<wstring> htd_file_list = 
+        get_all_htd_files_names_within_folder(bulk_data_folder);
 
 
     for (auto htd_file : htd_file_list)
@@ -339,6 +341,18 @@ int _tmain(int argc, _TCHAR* argv[])
         if (!htd_input_stream.eof())
         {
             htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
+            if (abs(header.IndexStop) > numeric_limits<double>::epsilon() )
+            {
+                std::wcout << L"Stop Index is not zero. Don't need correct. " << htd_file << L" Skipped. " << std::endl;
+                continue;
+            }
+
+            if (header.SequenceNumber == 4294967295)
+            //if (header.SequenceNumber == numeric_limits<LONGLONG>::quiet_NaN())
+            {
+                std::wcout << L"Invalid sequence number. " << htd_file << L" Skipped. " << std::endl;
+                continue;
+            }
         }
 
         // Read the column information
@@ -375,7 +389,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
         std::wcout << L" Has " <<corrected_time_1900_index.size() << L" wrong index" <<endl;
 
-
         std::wcout << L"\t Correcting index....";
         // Open htd file to correct data.
         fstream os_htd(htd_file, std::ios::binary | ios::in | ios::out);
@@ -385,13 +398,23 @@ int _tmain(int argc, _TCHAR* argv[])
 
         os_htd.seekp(header.HeaderSize, ios_base::beg);
 
+        double lastTimeIndex = 0.0;
+        assert(corrected_time_1900_index.size() == 1);
         for (auto item : corrected_time_1900_index)
         {
-
+            
             os_htd.seekg(item.filePos, std::ios::beg);
             os_htd.write((char *)& item.time1900, sizeof(double));
-
+            lastTimeIndex = item.time1900;
         }
+
+        std::wcout << L"\t Correcting header....";
+        header = { 0 };
+        os_htd.seekg(0, std::ios::beg);
+        os_htd.read((char*)&header, sizeof(HeaderLayout_t));
+        header.IndexStop = lastTimeIndex;
+        os_htd.seekg(0, std::ios::beg);
+        os_htd.write((char*)&header, sizeof(HeaderLayout_t));
 
         os_htd.close();
         std::wcout << L"...DONE..." << endl << endl;
