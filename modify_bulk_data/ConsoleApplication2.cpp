@@ -11,6 +11,7 @@
 #include <string>
 #include <limits>
 #include <assert.h>  
+#include <map>
 
 using namespace std;
 using namespace std::tr1;
@@ -122,32 +123,20 @@ struct BlobBlockHeader
 };
 
 
-struct TimeIndexValue
+struct RowData
 {
-    long seqNumber;
-    unsigned long filePos;
-    double time1900;
+    long SeqNo;
+    int IndexSampleValue;
+    double IndexDisplayValue;
+    std::map<string, vector<double>> ChannelValues;
 };
 
-//vector<string> get_all_htd_files_names_within_folder(string folder)
-//{
-//    vector<string> names;
-//    char search_path[200];
-//    sprintf(search_path, "%s/*.htd", folder.c_str());   // *.htd will filter all *.htd file out.
-//    WIN32_FIND_DATAA fd;
-//    HANDLE hFind = ::FindFirstFileA(search_path, &fd);
-//    if (hFind != INVALID_HANDLE_VALUE) {
-//        do {
-//            // read all (real) files in current folder
-//            // , delete '!' read other 2 default folder . and ..
-//            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-//                names.push_back(fd.cFileName);
-//            }
-//        } while (FindNextFileA(hFind, &fd));
-//        FindClose(hFind);
-//    }
-//    return names;
-//}
+struct BulkFileData
+{
+    wstring fileName;
+    std::map<string, ColumnInfoLayout_t> ChannelDataTypes;
+    vector<RowData> RowValues;
+};
 
 vector<wstring> get_all_htd_files_names_within_folder(wstring folder)
 {
@@ -174,163 +163,42 @@ vector<wstring> get_all_htd_files_names_within_folder(wstring folder)
 }
 
 
-
-vector<TimeIndexValue> read_time_1900(ifstream& htd_input_stream)
+wstring get_blb_file_namer(wstring htdFileName)
 {
-    vector<TimeIndexValue> time_1900_index;
 
-    htd_input_stream.seekg(0, std::ios::beg);
+    wstring strReplace = L".blb";
+    wstring strDest = L".htd";
 
-    HeaderLayout_t header = { 0 };
+    size_t pos = htdFileName.find(strDest);
+    wstring blbFileName = htdFileName.replace(pos, strDest.size(), strReplace);
 
-    if (!htd_input_stream.eof())
-    {
-        htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
-    }
-
-    // Read the column information
-    vector<ColumnInfoLayout_t> columns;
-    
-    htd_input_stream.seekg(128, std::ios::beg);
-
-    for (unsigned long seqNo = 0; seqNo < header.ColumnCount; seqNo++)
-    {
-        ColumnInfoLayout_t col = { 0 };
-        htd_input_stream.read((char*)&col, sizeof(ColumnInfoLayout_t));
-        columns.push_back(col);
-    }
-
-    time_1900_index.reserve(header.SequenceNumber);
-
-    for (size_t seqNo = 0; seqNo <= header.SequenceNumber; seqNo++)
-    {
-
-        unsigned long pos = header.HeaderSize + header.RowSize * seqNo;
-        htd_input_stream.seekg(pos, std::ios::beg);
-        long seq;
-        htd_input_stream.read((char*)&seq, sizeof(long));
-
-        for (auto itor = columns.begin(); itor != columns.end(); itor++)
-        {
-            if (std::string(itor->m_ColumnName) != "TIME_1900")
-            {
-                continue;
-            }
-
-            pos = header.HeaderSize + header.RowSize * seqNo + itor->m_ColumnOffset;
-            htd_input_stream.seekg(pos, std::ios::beg);
-
-            double time_index;
-            htd_input_stream.read((char*)&time_index, sizeof(double));
-
-            TimeIndexValue indexValue;
-            indexValue.filePos = pos;
-            indexValue.time1900 = time_index;
-            indexValue.seqNumber = seq;
-            time_1900_index.push_back(indexValue);
-            
-        }
-
-    }
-    return time_1900_index;
+    return blbFileName;
 }
 
 
-vector<TimeIndexValue> modified_indexs(const vector<TimeIndexValue>& original_time_indexs)
-{
-    vector<TimeIndexValue> full_modify_record;
-    double jump_space = 0.000094;
-   
-    int jumpback_ref_count = 0;    
-
-
-    double time_1900_previous_valid = 0.0;
-    double time_1900_next_valid = 0.0;
-
-    double latest_spacing = 0.0;
-
-    vector<TimeIndexValue> segment_modify_record;
-
-    for (size_t i = 1; i < original_time_indexs.size(); i++)
-    {
-        TimeIndexValue correction = original_time_indexs[i];
-        if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 < -1 * jump_space)
-        {
-            if (jumpback_ref_count == 0)
-            {
-                time_1900_previous_valid = original_time_indexs[i - 1].time1900;
-            }
-            jumpback_ref_count--;
-            segment_modify_record.push_back(correction);
-        }
-        else if (original_time_indexs[i].time1900 - original_time_indexs[i - 1].time1900 > jump_space)
-        {
-            if (jumpback_ref_count < 0)
-            {
-
-                jumpback_ref_count++;
-                if (jumpback_ref_count == 0)
-                {
-                    time_1900_next_valid = i < original_time_indexs.size() ? 
-                        original_time_indexs[i + 1].time1900 : std::numeric_limits<double>::quiet_NaN();
-                }
-                segment_modify_record.push_back(correction);
-
-            }
-        }
-        else
-        {
-            if (jumpback_ref_count < 0)
-            {
-                segment_modify_record.push_back(correction);
-            }
-        }
-
-        if (segment_modify_record.size() > 0 && jumpback_ref_count == 0)
-        {
-            double spacing = (time_1900_next_valid - time_1900_previous_valid) / (segment_modify_record.size() + 1);
-            
-            if (isnan(spacing))
-            {
-                spacing = latest_spacing;
-            }
-
-            for (size_t i = 0; i < segment_modify_record.size() ; i++)
-            {
-                segment_modify_record[i].time1900 = time_1900_previous_valid + (i + 1) * spacing;
-                full_modify_record.push_back(segment_modify_record[i]);
-            }
-
-            latest_spacing = spacing;
-            segment_modify_record.clear();
-            time_1900_previous_valid = 0.0;
-            time_1900_next_valid = 0.0;
-        }
-        
-    }
-
-    assert(jumpback_ref_count == 0);
-    return full_modify_record;
-}
-
-int _tmain(int argc, _TCHAR* argv[])
+BulkFileData LoadData(wstring htd_file)
 {
 
-    vector<wstring> htd_file_list = get_all_htd_files_names_within_folder(L"d:\\Schlumberger Data\\Horizon\\BulkData\\6FEC4982-5B1E-4271-81EB-AFAEA3CF5789");
-
-
-    for (auto htd_file : htd_file_list)
-    {
+        BulkFileData aBulkFileData;
+        aBulkFileData.fileName = htd_file;
         // Open htd file to read header.
         ifstream htd_input_stream(htd_file, std::ios::binary);
+        wstring blbFileName = get_blb_file_namer(htd_file);
+
+        ifstream blb_input_stream(blbFileName, std::ios::binary);
 
         if (!htd_input_stream.is_open())
         {
             std::wcout << L"Fail to open file: " << htd_file << std::endl;
-            return -1;
+            throw exception();
         }
 
-        std::wcout << L"Checking File : " << htd_file << L" indexs. " << std::endl;
+        if (!blb_input_stream.is_open())
+        {
+            std::wcout << L"Not found blb file: " << blbFileName << std::endl;
+        }
+        std::cout << std::endl;
+        std::wcout << L"Loading File : " << htd_file << std::endl;
 
         htd_input_stream.seekg(0, std::ios::beg);
 
@@ -341,62 +209,205 @@ int _tmain(int argc, _TCHAR* argv[])
             htd_input_stream.read((char*)&header, sizeof(HeaderLayout_t));
         }
 
+        aBulkFileData.RowValues.reserve(header.SequenceNumber);
         // Read the column information
         vector<ColumnInfoLayout_t> columns;
 
         htd_input_stream.seekg(128, std::ios::beg);
 
-        for (unsigned long seqNo = 0; seqNo < header.ColumnCount; seqNo++)
+        for (unsigned long i = 0; i < header.ColumnCount; i++)
         {
             ColumnInfoLayout_t col = { 0 };
             htd_input_stream.read((char*)&col, sizeof(ColumnInfoLayout_t));
             columns.push_back(col);
+            aBulkFileData.ChannelDataTypes[col.m_ColumnName] = col;
         }
 
+        for (size_t seqNo = 0; seqNo < header.SequenceNumber; seqNo++)
+        {
+            std::cout << "reading row : " << seqNo << "\r";
+            RowData rowData;
+            if (header.ImplicitIndexDirection == SLB_BULKDATASTORE_INDEX_INCREASING)
+            {
+                rowData.IndexSampleValue = header.ImplicitIndexStart + header.ImplicitIndexSamplingRate * seqNo;
+            }
+            else if (header.ImplicitIndexDirection == SLB_BULKDATASTORE_INDEX_DECREASING)
+            {
+                rowData.IndexSampleValue = header.ImplicitIndexStart - header.ImplicitIndexSamplingRate * seqNo;
+            }
 
-        htd_input_stream.seekg(header.HeaderSize, std::ios::beg);
+            rowData.IndexDisplayValue = (double)rowData.IndexSampleValue / 120.0;
+            rowData.SeqNo = seqNo;
 
-        std::wcout << L"\t Reading index....";
+            for (auto &column : columns)
+            {
+                string colname = column.m_ColumnName;
 
-        auto time_1900_indexs = read_time_1900(htd_input_stream);
+                rowData.ChannelValues[colname] = vector<double>();
+ 
+                if (column.m_ColumnDimensionCount == 1)
+                {
+                    unsigned long pos = header.HeaderSize + header.RowSize * seqNo + column.m_ColumnOffset;
+                    
+                    htd_input_stream.seekg(pos, std::ios::beg);
+                    
+                    BlobBlockHeader block;
+                    htd_input_stream.read((char*)&block, sizeof(BlobBlockHeader));
+                    //std::cout << "blob Offset: " << std::dec << block.BlobOffset << " Blob Size: " << block.BlobSize << std::endl;
+                    
+                    if (block.BlobOffset == -1)
+                    {
+                        continue;
+                    }
+                    blb_input_stream.seekg(block.BlobOffset, std::ios::beg);
+                    long prefacesize;
+                    blb_input_stream.read((char*)&prefacesize, sizeof(long));
 
-        
+                    vector<double> oneColValues;
+                    oneColValues.reserve(prefacesize);
+                    for (long i = 0; i < prefacesize; i++)
+                    {
+                        double doubleValue;
+                        //blb_input_stream.read((char*)&prefacesize, sizeof(long));
+                        switch (column.m_ColumnDataType)
+                        {
+                        case    DATA_TYPE_INT8:
+                        case    DATA_TYPE_UINT8:
+                        {
+                            INT8 value;
+                            blb_input_stream.read((char*)&value, sizeof(INT8));
+                            oneColValues.push_back(value);
+                        }
+                        break;
+                        case    DATA_TYPE_INT16:
+                        case    DATA_TYPE_UINT16:
+                        {
+                            INT16 value;
+                            blb_input_stream.read((char*)&value, sizeof(INT16));
+
+                            oneColValues.push_back(value);
+                        }
+                        break;
+                        case    DATA_TYPE_INT32:
+                        case    DATA_TYPE_UINT32:
+                        {
+                            int value;
+                            blb_input_stream.read((char*)&value, sizeof(int));
+                            oneColValues.push_back(value);
+                        }
+                        break;
+                        case    DATA_TYPE_IEEE32:
+                        {
+                            float value;
+                            blb_input_stream.read((char*)&value, sizeof(float));
+                            oneColValues.push_back(value);
+
+                        }
+                        break;
+
+                        case    DATA_TYPE_IEEE64:
+                        {
+                            double value;
+                            blb_input_stream.read((char*)&value, sizeof(double));
+
+                            oneColValues.push_back(value);
+
+                        }
+                        break;
+                        case    DATA_TYPE_IEEE32_COMPLEX:
+                        case    DATA_TYPE_IEEE64_COMPLEX:
+                        case    DATA_TYPE_ENUM_LONG:
+                        case    DATA_TYPE_ENUM_STRING:
+                        case    DATA_TYPE_STRING:
+                            throw;
+                        default:
+                            break;
+                        }
+                    }
+                    rowData.ChannelValues[colname].swap(oneColValues);
+                }
+                else if (column.m_ColumnDimensionCount == 0)
+                {
+                    unsigned long pos = header.HeaderSize + header.RowSize * seqNo + column.m_ColumnOffset;
+                    htd_input_stream.seekg(pos, std::ios::beg);
+                    switch (column.m_ColumnDataType)
+                    {
+                    case    DATA_TYPE_INT8:
+                    case    DATA_TYPE_UINT8:
+                    {
+                        INT8 value;
+                        htd_input_stream.read((char*)&value, sizeof(INT8));
+                        rowData.ChannelValues[colname].push_back(value);
+                    }
+                    break;
+                    case    DATA_TYPE_INT16:
+                    case    DATA_TYPE_UINT16:
+                    {
+                        INT16 value;
+                        htd_input_stream.read((char*)&value, sizeof(INT16));
+                        rowData.ChannelValues[colname].push_back(value);
+
+                    }
+                    break;
+                    case    DATA_TYPE_INT32:
+                    case    DATA_TYPE_UINT32:
+                    {
+                        int value;
+                        htd_input_stream.read((char*)&value, sizeof(int));
+                        rowData.ChannelValues[colname].push_back(value);
+
+                    }
+                    break;
+                    case    DATA_TYPE_IEEE32:
+                    {
+                        float value;
+                        htd_input_stream.read((char*)&value, sizeof(float));
+                        rowData.ChannelValues[colname].push_back(value);
+
+                    }
+                    break;
+
+                    case    DATA_TYPE_IEEE64:
+                    {
+                        double value;
+                        htd_input_stream.read((char*)&value, sizeof(double));
+                        rowData.ChannelValues[colname].push_back(value);
+
+                    }
+                        break;
+                    case    DATA_TYPE_IEEE32_COMPLEX:
+                    case    DATA_TYPE_IEEE64_COMPLEX:
+                    case    DATA_TYPE_ENUM_LONG:
+                    case    DATA_TYPE_ENUM_STRING:
+                    case    DATA_TYPE_STRING:
+                        throw ;
+                    default:
+                        break;
+                    }
+
+                }
+                else
+                    throw;
+            }
+            aBulkFileData.RowValues.push_back(move(rowData));
+         }
+
+       
         htd_input_stream.close();
-        std::wcout << L"...DONE..." <<endl;
+        blb_input_stream.close();
+        std::wcout << L"....DONE...." <<endl;
 
-        std::wcout << L"\t Checking index....";
-        auto corrected_time_1900_index = modified_indexs(time_1900_indexs);
+        return aBulkFileData;
+}
 
-        if (corrected_time_1900_index.size() == 0)
-        {
-            std::wcout << L"...No jump, skip..." << endl;
-            continue;
-        }
+int _tmain(int argc, _TCHAR* argv[])
+{
+    vector<wstring> htd_file_list = get_all_htd_files_names_within_folder(L"D:\\temp\\1");
 
-        std::wcout << L" Has " <<corrected_time_1900_index.size() << L" wrong index" <<endl;
-
-
-        std::wcout << L"\t Correcting index....";
-        // Open htd file to correct data.
-        fstream os_htd(htd_file, std::ios::binary | ios::in | ios::out);
-        streampos end;
-        os_htd.seekg(0, ios::end);
-        end = os_htd.tellg();
-
-        os_htd.seekp(header.HeaderSize, ios_base::beg);
-
-        for (auto item : corrected_time_1900_index)
-        {
-
-            os_htd.seekg(item.filePos, std::ios::beg);
-            os_htd.write((char *)& item.time1900, sizeof(double));
-
-        }
-
-        os_htd.close();
-        std::wcout << L"...DONE..." << endl << endl;
+    for (auto htdFile : htd_file_list)
+    {
+        BulkFileData data = LoadData(htdFile);
     }
 
-	return 0;
 }
 
