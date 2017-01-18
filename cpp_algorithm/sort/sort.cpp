@@ -13,15 +13,15 @@ void output_array(vector<int>& array)
 {
 	for (auto val : array)
 	{
-		cout << val << ",";
+		std::cout << val << ",";
 	}
-	cout << endl;
+	std::cout << endl;
 }
 
 
 void bubble_sort(vector<int>& unsorted_array)
 {
-	cout << "bubble_sort" << endl;
+	std::cout << "bubble_sort" << endl;
 
 	int compare_count = 0;
 	for (auto i = unsorted_array.begin(); i != unsorted_array.end(); i++)
@@ -36,14 +36,14 @@ void bubble_sort(vector<int>& unsorted_array)
 		}
 		output_array(unsorted_array);
 	}
-	cout << "Total Compare Count:" << compare_count << endl;
+	std::cout << "Total Compare Count:" << compare_count << endl;
 }
 
 
 
 void bubble_sort2(vector<int>& unsorted_array)
 {
-	cout << "bubble_sort2" << endl;
+	std::cout << "bubble_sort2" << endl;
 	int compare_count = 0;
 
 	for (auto i = unsorted_array.begin(); i != unsorted_array.end(); i++)
@@ -64,7 +64,7 @@ void bubble_sort2(vector<int>& unsorted_array)
 			break;
 		}
 	}
-	cout << "Total Compare Count:" << compare_count << endl;
+	std::cout << "Total Compare Count:" << compare_count << endl;
 }
 
 
@@ -78,7 +78,7 @@ void bubble_sort2(vector<int>& unsorted_array)
 //
 void bubble_sort_wuchong(vector<int>& unsorted_array)
 {
-	cout << "bubble_sort_wuchong" << endl;
+	std::cout << "bubble_sort_wuchong" << endl;
 
 	int compare_count = 0;
 	for (size_t i = 0; i < unsorted_array.size(); i++)
@@ -96,12 +96,12 @@ void bubble_sort_wuchong(vector<int>& unsorted_array)
 	}
 
 
-	cout << "Total Compare Count:" << compare_count << endl;
+	std::cout << "Total Compare Count:" << compare_count << endl;
 }
 
 void bubble_sort_wrong(vector<int>& unsorted_array)
 {
-	cout << "bubble_sort_wrong" << endl;
+	std::cout << "bubble_sort_wrong" << endl;
 
 	int compare_count = 0;
 	for (auto i = unsorted_array.begin(); i != unsorted_array.end(); i++)
@@ -116,12 +116,12 @@ void bubble_sort_wrong(vector<int>& unsorted_array)
 		}
 		output_array(unsorted_array);
 	}
-	cout << "Total Compare Count:" << compare_count << endl;
+	std::cout << "Total Compare Count:" << compare_count << endl;
 }
 
 void bubble_sort2_wrong(vector<int>& unsorted_array)
 {
-	cout << "bubble_sort2_wrong" << endl;
+	std::cout << "bubble_sort2_wrong" << endl;
 	int compare_count = 0;
 	for (auto i = unsorted_array.begin(); i != unsorted_array.end(); i++)
 	{
@@ -142,35 +142,93 @@ void bubble_sort2_wrong(vector<int>& unsorted_array)
 		}
 
 	}
-	cout << "Total Compare Count:" << compare_count << endl;
+	std::cout << "Total Compare Count:" << compare_count << endl;
 
 }
 
+
+void select_sort(vector<int>& arr)
+{
+	for (size_t i = 0; i < arr.size(); i++)
+	{
+		int min_pos = -1;
+		int min_val = std::numeric_limits<int>::max();
+		for (size_t j = i; j < arr.size(); j++)
+		{
+			if (arr[j] < min_val)
+			{
+				min_val = arr[j];
+				min_pos = j;
+			}
+		}
+		int temp = arr[i];
+		arr[i] = arr[min_pos];
+		arr[min_pos] = temp;
+	}
+
+}
+
+void select_sort2(vector<int>& arr)
+{
+	for (size_t i = 0; i < arr.size(); i++)
+	{
+		int min_pos = i;
+		for (size_t j = i + 1; j < arr.size(); j++)
+		{
+			if (arr[j] < arr[min_pos])
+				min_pos = j;
+		}
+		swap(arr[i], arr[min_pos]);
+	}
+}
+
+
+void insert_sort(vector<int>& arr)
+{
+	for (int i = 0; i < arr.size() - 1; i++)
+	{
+			int candidate = arr[i + 1];
+			int j = i;  // start from tail pos.
+			for (; j >= 0; j--)  
+			{
+				if (candidate < arr[j])
+					arr[j + 1] = arr[j];
+				else
+					break;
+			}
+			arr[j + 1 ] = candidate;
+	}
+}
 
 
 int main()
 {
 	//vector<int> unsorted_array = {2,1,3,4,5,6,0,7,8};
+	vector<int> one_val_array = {5 };
+	vector<int> unsorted_array = { 0, 7,8,5,2,1,3,4,6 }; // wrong bubble_sort2_wrong cannot handle.
+	//vector<int> unsorted_array = { 7, 1,8,5,2,0,3,4,6 }; // wrong bubble_sort2_wrong cannot handle.
 
-	//vector<int> unsorted_array = { 0, 7,8,5,2,1,3,4,6 }; // wrong bubble_sort2_wrong cannot handle.
-	vector<int> unsorted_array = { 7, 1,8,5,2,0,3,4,6 }; // wrong bubble_sort2_wrong cannot handle.
-
-	cout << "original" << endl;
+	std::cout << "original" << endl;
 	output_array(unsorted_array);
-	cout << endl;
+	std::cout << endl;
 
 
-	vector<int> v1(unsorted_array);
-	vector<int> v2(unsorted_array);
+	//vector<int> v1(unsorted_array);
+	//vector<int> v2(unsorted_array);
 
 
-	bubble_sort(vector<int>(unsorted_array));
-	bubble_sort_wuchong(vector<int>(unsorted_array));
+	//bubble_sort(vector<int>(unsorted_array));
+	//bubble_sort_wuchong(vector<int>(unsorted_array));
 
-	bubble_sort2(vector<int>(unsorted_array));
-	bubble_sort_wrong(vector<int>(unsorted_array));
-	bubble_sort2_wrong(vector<int>(unsorted_array));
+	//bubble_sort2(vector<int>(unsorted_array));
+	//bubble_sort_wrong(vector<int>(unsorted_array));
+	//bubble_sort2_wrong(vector<int>(unsorted_array));
 
+	//select_sort2(unsorted_array);
+	insert_sort(unsorted_array);
+
+	std::cout << "sorted" << endl;
+	output_array(unsorted_array);
     return 0;
 }
 
