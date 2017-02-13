@@ -3,8 +3,9 @@
 
 #include "stdafx.h"
 #include "vector"
-#include "iostream"
-#include "algorithm"
+#include <iostream>
+#include <algorithm>
+#include <random>
 
 using namespace std;
 
@@ -232,7 +233,7 @@ void insert_sort2(vector<int>& arr)
 }
 
 
-void split(vector<int>& arr, vector<int>& left, vector<int>& right)
+void merge_partition(vector<int>& arr, vector<int>& left, vector<int>& right)
 {
 	int mid = arr.size() / 2; 
 	for (size_t i = 0; i < arr.size(); i++)
@@ -287,7 +288,7 @@ vector<int> merge_sort(vector<int>& arr)
 
 	vector<int> left, right;
 
-	split(arr, left, right);
+	merge_partition(arr, left, right);
 	
 	left = merge_sort(left);
 
@@ -299,6 +300,32 @@ vector<int> merge_sort(vector<int>& arr)
 }
 
 
+int quick_sort_partition(vector<int>& arr, int low, int high)
+{
+	int pivot = arr[high];
+	int i = low -1;
+	for (size_t j = low; j <= high - 1 ; j++)
+	{
+		if (arr[j] <= pivot)
+		{
+			i++;
+			swap(arr[i], arr[j]);
+		}
+	}
+	swap(arr[i + 1], arr[high]);
+	return i + 1;
+}
+
+void quick_sort(vector<int>& arr, int low, int high)
+{
+	if (low < high)
+	{
+		int pos = quick_sort_partition(arr, low, high);
+		quick_sort(arr, low, pos - 1);
+		quick_sort(arr, pos + 1, high);
+	}
+
+}
 
 int main()
 {
@@ -327,6 +354,9 @@ int main()
 
 	//select_sort2(unsorted_array);
 	//insert_sort2(unsorted_array);
+
+	vector<int> arr = { 0, 7,8,5,2,1,3,4,6 };
+	quick_sort(arr, 0, 8);
 
 	auto result = merge_sort(unsorted_array);
 
