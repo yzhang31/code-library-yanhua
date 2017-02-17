@@ -34,6 +34,7 @@ String::String(const String& rhs)
 	printf("Copy Constuct called.\n");
 	if (rhs.data)
 	{
+		// delete[] data;  Do't delete here, copy construct dont' need.
 		data = new char[strlen(rhs.data) + 1];
 		strcpy(data, rhs.data);
 	}
@@ -48,8 +49,14 @@ String& String::operator=(String& rhs)
 {
 	printf("operator= called.\n");
 
+	if (this == &rhs)    //Need check !!
+	{
+		return *this;
+	}
+
 	if (rhs.data)
 	{
+		delete[] data;  // Delete old memory.
 		data = new char[strlen(rhs.data) + 1];
 		strcpy(data, rhs.data);
 	}
@@ -81,8 +88,12 @@ void main()
 	}
 	
 	String c = a; // Trigger copy construct.
+
 	String s = "The Truth is Out There"; // Trigger constuct.
 	doNothing(s); // Pass by value, trigger copy construct.
+
+
+	s = s;   // if op= no self pointer check, will crash.
 
 	a = s = c; // If op= define return (String * or void), this line cannot pass build.
 
