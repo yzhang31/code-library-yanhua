@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h> // include.
 
-class String 
+class String
 {
 public:
 	String(const char *value);  // const input parameter.
@@ -13,7 +13,7 @@ private:
 	char *data;
 };
 
-String::String(const char *value) 
+String::String(const char *value)
 {
 	printf("Constuct const called.\n");
 	if (value)
@@ -45,7 +45,7 @@ String::String(const String& rhs)
 	}
 }
 
-String& String::operator=(String& rhs)  
+String& String::operator=(String& rhs)
 {
 	printf("operator= called.\n");
 
@@ -73,7 +73,7 @@ String::~String()
 	delete[] data;  // Don't forget '[]'
 }
 
-void doNothing(String localString)  
+void doNothing(String localString)
 {
 
 }
@@ -84,12 +84,12 @@ void main()
 	{
 		String b("World");
 		b = a;   // Trigger op=;
-		
 	}
-	
+
 	String c = a; // Trigger copy construct.
 
 	String s = "The Truth is Out There"; // Trigger constuct.
+
 	doNothing(s); // Pass by value, trigger copy construct.
 
 
