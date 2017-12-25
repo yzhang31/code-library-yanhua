@@ -19,7 +19,7 @@ String::String(const char *value)
 	if (value)
 	{
 		data = new char[strlen(value) + 1];
-		strcpy(data, value);
+		strcpy_s(data, strlen(value) + 1, value);
 	}
 	else
 	{
@@ -36,7 +36,7 @@ String::String(const String& rhs)
 	{
 		// delete[] data;  Do't delete here, copy construct dont' need.
 		data = new char[strlen(rhs.data) + 1];
-		strcpy(data, rhs.data);
+		strcpy_s(data, strlen(rhs.data) + 1, rhs.data);
 	}
 	else
 	{
@@ -58,7 +58,7 @@ String& String::operator=(String& rhs)
 	{
 		delete[] data;  // Delete old memory.
 		data = new char[strlen(rhs.data) + 1];
-		strcpy(data, rhs.data);
+		strcpy_s(data, strlen(rhs.data) + 1, rhs.data);
 	}
 	else
 	{
