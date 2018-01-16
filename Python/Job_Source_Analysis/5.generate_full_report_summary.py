@@ -36,7 +36,7 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("LATI", None, "Enter Latitude,Input,TextBox", r',UIInteraction'),
                 ("LONG", None, "Enter Longitude,Input,TextBox,", r',UIInteraction'),
                 ("BLI", None, "Enter BLI,Input,TextBox,", r',UIInteraction'),
-                ("Active Run", None, "Setup,Equipment,", r', Run,Click,Button,Activate,UIInteraction,')]
+                ("Active Run", None, "Setup,Equipment,", r' Run,Click,Button,Activate,UIInteraction,')]
 
 def generate_single_job_summary(source_file_list):
     global extact_infos
