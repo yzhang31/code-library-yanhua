@@ -11,14 +11,14 @@ def build_job_file_map(source_dir):
     for root, dirs, files in os.walk(os.path.abspath(source_dir)):
         for file in files:
             full_path = os.path.join(root, file)
-            guid = build_job_guid(file)
+            guid = extrac_guid_from_filename(file)
             if(guid in guid_files_map):
                 guid_files_map[guid].append(str(full_path))
             else:
                 guid_files_map[guid] = [str(full_path)]
     return  guid_files_map
 
-def build_job_guid(file_name):
+def extrac_guid_from_filename(file_name):
     seps = str(file_name).split("_")
     return seps[-5]
 
@@ -36,8 +36,9 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("LATI", None, "Enter Latitude,Input,TextBox", r',UIInteraction'),
                 ("LONG", None, "Enter Longitude,Input,TextBox,", r',UIInteraction'),
                 ("BLI", None, "Enter BLI,Input,TextBox,", r',UIInteraction'),
-                ("Active Run", None, "Setup,Equipment,", r' Run,Click,Button,Activate,UIInteraction,')]
-
+                ("Active Run", None, "Setup,Equipment,", r' Run,Click,Button,Activate,UIInteraction,'),
+                ("WL Station/Pass Started", None, "Data Acquiring - WL,Start ", r' Pass,Click,Button,Start,UIInteraction,')
+                ]
 def generate_single_job_summary(source_file_list):
     global extact_infos
     row_dict = dict((a,b) for a,b,c,d in extact_infos)
