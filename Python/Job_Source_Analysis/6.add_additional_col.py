@@ -3,7 +3,6 @@ import csv
 
 def process(input_file, ref_csv_file, output_file):
     #read ref file into dict {jobuid:type}
-
     csv.field_size_limit(100000000)
     ref_guid_jobtype_dict = {}
     with open(ref_csv_file, 'r', encoding="utf-8") as ref_csv:
@@ -11,8 +10,8 @@ def process(input_file, ref_csv_file, output_file):
         for row in dict_reader:
             ref_guid_jobtype_dict[str(row["JOB_GUID"]).upper()] = row["JOB_SOURCE"]
     #write additional column into output csv.
-    with open(input_file, 'r') as csvinput:
-        with open(output_file, 'w') as csvoutput:
+    with open(input_file, 'r',encoding="utf-8") as csvinput:
+        with open(output_file, 'w', newline='',encoding="utf-8") as csvoutput:
             writer = csv.writer(csvoutput, lineterminator='\n')
             reader = csv.reader(csvinput)
 

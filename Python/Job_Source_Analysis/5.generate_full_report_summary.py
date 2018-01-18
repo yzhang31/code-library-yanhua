@@ -1,8 +1,5 @@
 import os
-from os import listdir
-from os.path import isfile, join
-import shutil
-import zipfile
+from collections import OrderedDict
 import re
 import csv
 
@@ -30,6 +27,7 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("work_flow","","Workflow=",";"),
                 ("simulator","","Simulator=",";"),
                 ("machine_name","","MachineName=",";"),
+                ("Engineer Name", None,"Enter engineer name,Input,TextBox,",",UIInteraction,RunGuid"),
                 ("RTBackupDir","","RTBackupDir=",";"),
                 ("SON", None, "GridCell,", r',UIInteraction,OSDD=SON'),
                 ("LUN", None, "GridCell,", r',UIInteraction,OSDD=SON'),
@@ -37,13 +35,13 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("LONG", None, "Enter Longitude,Input,TextBox,", r',UIInteraction'),
                 ("BLI", None, "Enter BLI,Input,TextBox,", r',UIInteraction'),
                 ("Active Run", None, "Setup,Equipment,", r' Run,Click,Button,Activate,UIInteraction,'),
-                ("WL Station/Pass Started", None, "Data Acquiring - WL,Start ", r' Pass,Click,Button,Start,UIInteraction,')
+                ("WL Station/Pass Started", None, "WLAcquisition,Data Acquiring - WL,Start ", r' Pass,Click,Button,Start,UIInteraction,'),
+                ("Generate Dliverable", None, "Create/Publish...,UIInteraction,ComponentName=", r';DelivTemplateGuid')
                 ]
 def generate_single_job_summary(source_file_list):
     global extact_infos
     row_dict = dict((a,b) for a,b,c,d in extact_infos)
     for f in source_file_list:
-        print(f)
         file = open(f, encoding="utf8")
         content = file.read()
 
@@ -54,34 +52,61 @@ def generate_single_job_summary(source_file_list):
         file.close()
     return row_dict
 
+
+def analyze_job_operations(source_file_list):
+
+    operation_time_dict = OrderedDict()
+    for f in source_file_list:
+        file = open(f, encoding="utf8")
+        csvReader = csv.reader(file)
+        for row in csvReader:
+
+            if(len(row) == 0): continue
+
+            if (str(row[0]).replace('.','').isdigit()):
+                operation_time_dict[row[0]] = row[1:]
+        file.close()
+
+    op_count = len(operation_time_dict.keys())
+    return {"User Actions":op_count}
+
 def find(start, end, inputtext):
-    result = []
+    result = set()
     search = r'(?<={}).*?(?={})'.format(start, end)
     for matchedtext in re.findall(search, inputtext):
-        result.append(matchedtext)
+        result.add(matchedtext)
 
     if(len(result) > 0):
-        return result[0]
+        return '/'.join(result)
     else:
         return None
 
 def generate_summary_csv(summary):
+    fieldnames = summary[0].keys()
     with open(r'd:\job_info_summary.csv', 'w', newline='',encoding="utf-8") as csvfile:
-        fieldnames = [a for a,b,c,d in extact_infos]
+        #fieldnames = [a for a,b,c,d in extact_infos]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for row in summary:
             writer.writerow(row)
     return
 
+def process_data(guid_files_map):
+    summary = []
+    progress = 0
+
+    for job_guid in guid_files_map:
+        row_dict = generate_single_job_summary(guid_files_map[job_guid])
+        addition_dict = analyze_job_operations(guid_files_map[job_guid])
+        row_dict.update(addition_dict)
+        summary.append((row_dict))
+        progress = progress + 1
+        print(r'{0:.2f}% progress... The {1} file in {2} files.'.format((progress/len(guid_files_map)) * 100, progress, len(guid_files_map)))
+    return summary
+
 source_dir = "D:\\5\\"
 
 guid_files_map = build_job_file_map(source_dir)
-
-summary = []
-for job_guid in guid_files_map:
-    row_dict = generate_single_job_summary(guid_files_map[job_guid])
-    summary.append((row_dict))
-
+summary = process_data(guid_files_map)
 generate_summary_csv(summary)
 print(str(__file__) + " : done")
