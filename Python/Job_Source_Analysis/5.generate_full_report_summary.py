@@ -36,7 +36,8 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("BLI", None, "Enter BLI,Input,TextBox,", r',UIInteraction'),
                 ("Active Run", None, "Setup,Equipment,", r' Run,Click,Button,Activate,UIInteraction,'),
                 ("WL Station/Pass Started", None, "WLAcquisition,Data Acquiring - WL,Start ", r' Pass,Click,Button,Start,UIInteraction,'),
-                ("Generate Dliverable", None, "Create/Publish...,UIInteraction,ComponentName=", r';DelivTemplateGuid')
+                ("Generate Dliverables", None, "Create/Publish...,UIInteraction,ComponentName=", r';DelivTemplateGuid'),
+                ("Open Shop Calibration", None, "Setup,Equipment,", r' ToolString for Shop Calibration,Click,ContextMenu,Activate for Checks and Calibration,')
                 ]
 def generate_single_job_summary(source_file_list):
     global extact_infos

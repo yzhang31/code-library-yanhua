@@ -10,3 +10,9 @@
 *.sdf
 *.ipch
 *.opendb
+.idea/workspace.xml
+.idea/modules.xml
+.idea/misc.xml
+.idea/codeStyles/codeStyleConfig.xml
+.idea/codeStyles/Project.xml
+.idea/code-library-yanhua.iml
