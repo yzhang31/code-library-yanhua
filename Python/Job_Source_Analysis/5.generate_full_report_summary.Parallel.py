@@ -2,6 +2,7 @@ import os
 from collections import OrderedDict
 import re
 import csv
+import os, multiprocessing as mp
 import time
 
 def build_job_file_map(source_dir):
@@ -10,6 +11,11 @@ def build_job_file_map(source_dir):
         for file in files:
             full_path = os.path.join(root, file)
             guid = extrac_guid_from_filename(file)
+            machine_name = extrac_machine_name_from_filename(full_path)
+            #filter out VM.
+            if  (machine_name.startswith("BGC-QA") or machine_name.startswith("HPV") or machine_name.startswith("MW-QA")):
+                continue
+
             if(guid in guid_files_map):
                 guid_files_map[guid].append(str(full_path))
             else:
@@ -19,6 +25,12 @@ def build_job_file_map(source_dir):
 def extrac_guid_from_filename(file_name):
     seps = str(file_name).split("_")
     return seps[-5]
+
+def extrac_machine_name_from_filename(file_name):
+    seps = str(file_name).split("@")
+    seps = seps[1].split("__")
+    return seps[0]
+
 
 extact_infos = [("job_guid","","JobGUID=",";"),
                 ("job_name","","JobName=",";"),
@@ -39,7 +51,7 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("Generate Dliverables", None, "Create/Publish...,UIInteraction,ComponentName=", r';DelivTemplateGuid'),
                 ("Open Shop Calibration", None, "Setup,Equipment,", r' ToolString for Shop Calibration,Click,ContextMenu,Activate for Checks and Calibration,'),
                 ("Connect HSPM", None, r'DnMAcquisition,Data Acquiring - D&M,HSPM Control/', r',Click,Button,Connect,UIInteraction'),
-                ("Connect InterACT", None, r'ComponentName=WITSML Standard;ComponentCode=Component_Template_Witsml;', r'\n'),
+                ("Connect InterACT", None, r'ComponentName=WITSML Standard;ComponentCode=Component_Template_Witsml;Publisher=', r'\n'),
                 ("Create JA", None, r'ArchiveGuid=', r'\n'),
                 ("Create PDF", None, r'Graphical,Print/Create PDF for Template,Click,ContextMenu,Print/PDF', r'\n'),
                 ("IPAddress_1", None, r'IPAddress_1=', r';'),
@@ -57,7 +69,13 @@ def generate_single_job_summary(source_file_list):
             if not ( re_result == None):
                 row_dict[item[0]] = re_result
         file.close()
+
+    op_counts = analyze_job_operations(source_file_list)
+
+    row_dict.update(op_counts)
+
     return row_dict
+
 
 def analyze_job_operations(source_file_list):
 
@@ -97,27 +115,61 @@ def generate_summary_csv(summary):
             writer.writerow(row)
     return
 
-def process_data(guid_files_map):
-    summary = []
-    progress = 0
 
+def callback(item):
+    global processed_file_numbers
+    processed_file_numbers += 1
+    print(r'{0:.2f}% progress... The {1} file in {2} files.'
+          .format((processed_file_numbers / total_file_numbers) * 100,
+          processed_file_numbers,
+          total_file_numbers))
+
+def process_data_parallel(guid_files_map):
+    summary = []
+    results = []
+    pool = mp.Pool()
     for job_guid in guid_files_map:
-        row_dict = generate_single_job_summary(guid_files_map[job_guid])
-        addition_dict = analyze_job_operations(guid_files_map[job_guid])
-        row_dict.update(addition_dict)
-        summary.append((row_dict))
-        progress = progress + 1
-        print(r'{0:.2f}% progress... The {1} file in {2} files.'.format((progress/len(guid_files_map)) * 100, progress, len(guid_files_map)))
+        proc = pool.apply_async(generate_single_job_summary, args=[guid_files_map[job_guid]], callback = callback)
+        results.append(proc)
+    pool.close()
+    pool.join()
+    # iterate through results
+    for proc in results:
+        processfile_result = proc.get()
+        summary.append((processfile_result))
+
+    return summary
+
+
+def process_data_parallel_map(guid_files_map):
+    progress = 0
+    summary = []
+    results = []
+    pool = mp.Pool()
+
+    results = pool.map(generate_single_job_summary,guid_files_map.values())
+
+    pool.close()
+    pool.join()
+    # iterate through results
+    for proc in results:
+        processfile_result = proc.get()
+        summary.append((processfile_result))
+
     return summary
 
 if __name__ == "__main__":
     start = time.clock()
-    source_dir = "D:\\5\\"
+    processed_file_numbers = 0
+    total_file_numbers = 0
 
+    source_dir = "D:\\5\\"
     guid_files_map = build_job_file_map(source_dir)
-    summary = process_data(guid_files_map)
+    total_file_numbers =  len(guid_files_map)
+    summary = process_data_parallel(guid_files_map)
+    #summary = process_data_parallel_map(guid_files_map)
     generate_summary_csv(summary)
-    print(str(__file__) + " : done")
+
     elapsed = (time.clock() - start)
 
     print(str(__file__) + " : done {0} s".format(elapsed))
