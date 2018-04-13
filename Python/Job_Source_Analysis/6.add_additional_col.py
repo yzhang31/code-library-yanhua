@@ -5,10 +5,12 @@ def process(input_file, ref_csv_file, output_file):
     #read ref file into dict {jobuid:type}
     csv.field_size_limit(100000000)
     ref_guid_jobtype_dict = {}
+    additional_cols = ['NUM_OF_TERMINAL_CRASHES','DURATION(hrs)',"JOB_SOURCE"]
     with open(ref_csv_file, 'r', encoding="utf-8") as ref_csv:
         dict_reader = csv.DictReader(ref_csv,quoting = csv.QUOTE_NONE)
         for row in dict_reader:
-            ref_guid_jobtype_dict[str(row["JOB_GUID"]).upper()] = [row['DURATION(hrs)'],row["JOB_SOURCE"]]
+            ref_guid_jobtype_dict[str(row["JOB_GUID"]).upper()] = \
+                [row[additional_cols[0]],row[additional_cols[1]],row[additional_cols[2]]]
     #write additional column into output csv.
     with open(input_file, 'r',encoding="utf-8") as csvinput:
         with open(output_file, 'w', newline='',encoding="utf-8") as csvoutput:
@@ -17,15 +19,14 @@ def process(input_file, ref_csv_file, output_file):
 
             all = []
             row = next(reader)
-            row.append('Duration (hr)')
-            row.append('Ref Source')
+            row += additional_cols
             all.append(row)
 
             for row in reader:
                 if (row[0].upper() in ref_guid_jobtype_dict):
                     row = row + ref_guid_jobtype_dict[row[0].upper()]
                 else:
-                    row = row +['','Not Found']
+                    row = row +['','','Not Found']
                 all.append(row)
 
             writer.writerows(all)

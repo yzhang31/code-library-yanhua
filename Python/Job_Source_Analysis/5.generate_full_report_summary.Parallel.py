@@ -13,7 +13,9 @@ def build_job_file_map(source_dir):
             guid = extrac_guid_from_filename(file)
             machine_name = extrac_machine_name_from_filename(full_path)
             #filter out VM.
-            if  (machine_name.startswith("BGC-QA") or machine_name.startswith("HPV") or machine_name.startswith("MW-QA")):
+            if  (machine_name.startswith("BGC-QA") or machine_name.startswith("HPV")
+                    or machine_name.startswith("MW-QA"))\
+                    or "HYPERV" in machine_name:
                 continue
 
             if(guid in guid_files_map):
@@ -37,6 +39,7 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("MW_version","","MWVersion=",r'\n'),
                 ("well_name","","WellName=",";"),
                 ("client_name","","ClientName=",";"),
+                ("start_date","",";StartDate=",";Workflow="),
                 ("work_flow","","Workflow=",";"),
                 ("simulator","","Simulator=",";"),
                 ("machine_name","","MachineName=",";"),
@@ -44,6 +47,7 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("RTBackupDir","","RTBackupDir=",";"),
                 ("SON", None, "GridCell,", r',UIInteraction,OSDD=SON'),
                 ("LUN", None, "GridCell,", r',UIInteraction,OSDD=SON'),
+                ("CONT_REGION", None, "GridCell,", r',UIInteraction,OSDD=CONT_REGION'),
                 ("LATI", None, "Enter Latitude,Input,TextBox", r',UIInteraction'),
                 ("LONG", None, "Enter Longitude,Input,TextBox,", r',UIInteraction'),
                 ("BLI", None, "Enter BLI,Input,TextBox,", r',UIInteraction'),
@@ -52,7 +56,7 @@ extact_infos = [("job_guid","","JobGUID=",";"),
                 ("Open Shop Calibration", None, "Setup,Equipment,", r' ToolString for Shop Calibration,Click,ContextMenu,Activate for Checks and Calibration,'),
                 ("Connect HSPM", None, r'DnMAcquisition,Data Acquiring - D&M,HSPM Control/', r',Click,Button,Connect,UIInteraction'),
                 ("Connect InterACT", None, r'ComponentName=WITSML Standard;ComponentCode=Component_Template_Witsml;Publisher=', r'\n'),
-                ("Create JA", None, r'ArchiveGuid=', r'\n'),
+                ("Create JA/RA", None, r'ArchiveGuid=', r'\n'),
                 ("Create PDF", None, r'Graphical,Print/Create PDF for Template,Click,ContextMenu,Print/PDF', r'\n'),
                 ("IPAddress_1", None, r'IPAddress_1=', r';'),
                 ("IPAddress_2", None, r'IPAddress_2=', r';')
