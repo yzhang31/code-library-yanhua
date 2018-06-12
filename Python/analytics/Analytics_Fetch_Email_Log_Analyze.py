@@ -10,7 +10,7 @@ def CopySMLZipFileWithFilter(source_dir):
             full_path = os.path.join(root, file)
             pos = str(file).find(".")
             timestring = str(file)[pos+1:pos+9]
-            if int(timestring) < 20180322:
+            if int(timestring) < 20180415:
                 continue
             f = open(full_path,  encoding="utf8")
             content = f.read()
